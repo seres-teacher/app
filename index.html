@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volejbalový Turnaj - Správa a Výsledky</title>
+    <!-- Tailwind CSS přes CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Horní Navigace -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid font-bold text-2xl text-amber-500 fa-volleyball"></i>
+                <h1 class="text-xl font-bold tracking-wide">Volejbalový Turnaj</h1>
+            </div>
+
+            <!-- Uživatelský profil / Přihlášení -->
+            <div id="userProfileArea" class="flex items-center space-x-3">
+                <span id="userInfo" class="text-sm text-slate-300">Načítání...</span>
+                <button id="loginBtn" onclick="openModal('loginModal')" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-1.5 rounded-lg text-sm transition shadow">
+                    <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Přihlásit se
+                </button>
+                <button id="logoutBtn" onclick="logout()" class="hidden bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-1.5 rounded-lg text-sm transition shadow">
+                    <i class="fa-solid fa-right-from-bracket mr-1.5"></i>Odhlásit
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hlavní Obsah -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+        
+        <!-- Přehled Turnaje / Stav -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span id="roleBadge" class="text-xs font-bold uppercase px-2.5 py-1 rounded bg-slate-200 text-slate-700">GUEST</span>
+                        <h2 id="tournamentTitle" class="text-2xl font-black text-slate-800">Načítání turnaje...</h2>
+                    </div>
+                    <p id="tournamentSub" class="text-sm text-slate-500 mt-1">Vyberte turnaj nebo se přihlaste pro správu.</p>
+                </div>
+                <div id="tournamentActions" class="flex flex-wrap gap-2">
+                    <!-- Tlačítka pro Superadmina / Organizátora se načtou dynamicky -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Mřížka s hřišti a zápasy -->
+        <div id="matchesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Dynamicky vkládané zápasy a hřiště -->
+        </div>
+
+    </main>
+
+    <!-- Modal Přihlášení -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="bg-slate-900 text-white p-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-user-lock mr-2 text-amber-500"></i>Přihlášení do systému</h3>
+                <button onclick="closeModal('loginModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <form onsubmit="event.preventDefault(); submitUserLogin();" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Uživatelské jméno</label>
+                    <input type="text" id="loginUsername" required autocomplete="username" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Heslo</label>
+                    <input type="password" id="loginPassword" required autocomplete="current-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none">
+                </div>
+                <div class="pt-2 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('loginModal')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-medium hover:bg-slate-50">Zrušit</button>
+                    <button type="submit" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg shadow">Přihlásit se</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Skripty -->
+    <script>
+        // Univerzální bezpečné API rozhraní (posílá 'action' v URL i v JSONu)
+        async function apiFetch(actionName, data = {}) {
+            try {
+                const payload = { action: actionName, ...data };
+                const response = await fetch(`api.php?action=${encodeURIComponent(actionName)}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('Chyba komunikace s API:', error);
+                return null;
+            }
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        // Načtení stavu aplikace
+        async function fetchState() {
+            const data = await apiFetch('get_state');
+            
+            const userInfo = document.getElementById('userInfo');
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const roleBadge = document.getElementById('roleBadge');
+            const tournamentTitle = document.getElementById('tournamentTitle');
+            const tournamentSub = document.getElementById('tournamentSub');
+
+            if (!data) {
+                tournamentTitle.textContent = "Chyba načítání dat";
+                return;
+            }
+
+            const role = data.userRole || 'GUEST';
+            roleBadge.textContent = role;
+            roleBadge.className = `text-xs font-bold uppercase px-2.5 py-1 rounded ${
+                role === 'SUPERADMIN' ? 'bg-rose-500 text-white' : 
+                role === 'ORGANIZER' ? 'bg-emerald-500 text-white' : 
+                role === 'REFEREE' ? 'bg-amber-500 text-slate-900' : 'bg-slate-200 text-slate-700'
+            }`;
+
+            if (role !== 'GUEST') {
+                userInfo.innerHTML = `<span class="font-bold text-white">${data.username || 'Uživatel'}</span>`;
+                loginBtn.classList.add('hidden');
+                logoutBtn.classList.remove('hidden');
+            } else {
+                userInfo.textContent = "Host";
+                loginBtn.classList.remove('hidden');
+                logoutBtn.classList.add('hidden');
+            }
+
+            if (data.hasTournament && data.tournament) {
+                tournamentTitle.textContent = data.tournament.name;
+                tournamentSub.textContent = `Aktivní turnaj | Zápasů: ${data.matches ? data.matches.length : 0}`;
+                renderMatches(data.matches || []);
+            } else {
+                tournamentTitle.textContent = "Žádný aktivní turnaj";
+                tournamentSub.textContent = "Vyberte turnaj ze seznamu nebo vytvořte nový.";
+                document.getElementById('matchesContainer').innerHTML = `
+                    <div class="col-span-full text-center py-12 text-slate-400">
+                        <i class="fa-solid fa-trophy text-5xl mb-3 block"></i>
+                        <p class="text-lg">Momentálně není načten žádný turnaj.</p>
+                    </div>`;
+            }
+        }
+
+        // Vykreslení karet se zápasy
+        function renderMatches(matches) {
+            const container = document.getElementById('matchesContainer');
+            if (matches.length === 0) {
+                container.innerHTML = `<p class="col-span-full text-center text-slate-400 py-8">Žádné rozpisy zápasů.</p>`;
+                return;
+            }
+
+            container.innerHTML = matches.map(m => `
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-4 flex flex-col justify-between">
+                    <div class="flex justify-between items-center text-xs text-slate-500 mb-3 border-b pb-2">
+                        <span class="font-bold text-slate-700">Hřiště ${m.court_number || '?'}</span>
+                        <span class="px-2 py-0.5 rounded font-semibold ${
+                            m.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-800 animate-pulse' :
+                            m.status === 'FINISHED' ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-blue-700'
+                        }">${m.status}</span>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-800">${m.team1_name}</span>
+                            <span class="text-2xl font-black text-slate-900">${m.score1}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-800">${m.team2_name}</span>
+                            <span class="text-2xl font-black text-slate-900">${m.score2}</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs text-slate-500">
+                        <span>Sety: ${m.sets1} : ${m.sets2}</span>
+                        <span>Kategorie: ${m.category || '-'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Přihlášení uživatele
+        async function submitUserLogin() {
+            const u = document.getElementById('loginUsername').value;
+            const p = document.getElementById('loginPassword').value;
+
+            const data = await apiFetch('login_user', { username: u, password: p });
+
+            if (data && data.success) {
+                closeModal('loginModal');
+                document.getElementById('loginUsername').value = '';
+                document.getElementById('loginPassword').value = '';
+                fetchState();
+            } else {
+                alert((data && data.message) ? data.message : "Přihlášení selhalo. Zkontrolujte jméno a heslo.");
+            }
+        }
+
+        // Odhlášení
+        async function logout() {
+            await apiFetch('logout_user');
+            fetchState();
+        }
+
+        // Načtení po startu
+        document.addEventListener('DOMContentLoaded', fetchState);
+    </script>
+</body>
+</html>
